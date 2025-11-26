@@ -1,7 +1,7 @@
 using UnityEngine;
 
 [RequireComponent(typeof(Rigidbody2D))]
-[RequireComponent(typeof(SpriteRenderer))] // Adicionado para garantir que o Flip funcione
+[RequireComponent(typeof(SpriteRenderer))]
 public class PlayerMovement2D : MonoBehaviour
 {
     [Header("Movement")]
@@ -11,10 +11,17 @@ public class PlayerMovement2D : MonoBehaviour
     [Header("Jump")]
     [SerializeField] private float jumpForce = 10f;
 
+    [Header("Super Jump")]
+    [SerializeField] private float maxChargeTime = 1.5f;
+    [SerializeField] private float maxSuperJumpForce = 22f;
+    [SerializeField] private ParticleSystem chargeParticles;
+
+    private bool superJumpEnabled = false;
+    private bool isCharging = false;
+    private float chargeTimer = 0f;
+
     [Header("Ground Check")]
-    // Distância máxima do raio para o chão
     [SerializeField] private float groundCheckDistance = 0.2f;
-    // Camada que define o que é considerado chão (Configurar no Inspector!)
     [SerializeField] private LayerMask groundLayer;
 
     private Rigidbody2D rb;
@@ -27,56 +34,109 @@ public class PlayerMovement2D : MonoBehaviour
         rb = GetComponent<Rigidbody2D>();
         spriteRenderer = GetComponent<SpriteRenderer>();
 
-        rb.isKinematic = false;
+        rb.bodyType = RigidbodyType2D.Dynamic;
 
-        // Configura detecção contínua para evitar interpenetração (problema de "túnel")
-        rb.collisionDetectionMode = CollisionDetectionMode2D.Continuous;
+        if (chargeParticles != null)
+            chargeParticles.Stop(); // impede partículas no início
     }
 
     void Update()
     {
-        // 1. COLETAR INPUTS no Update()
+        // ATIVADOR/DESATIVADOR DO SUPER JUMP (tecla E)
+        if (Input.GetKeyDown(KeyCode.E))
+        {
+            superJumpEnabled = !superJumpEnabled;
+            Debug.Log("Super Jump ativo: " + superJumpEnabled);
+
+            if (!superJumpEnabled)
+                StopCharging();
+        }
+
+        // Movimento
         horizontalInput = Input.GetAxis("Horizontal");
 
-        // 2. LÓGICA DO PULO no Update()
-        if (Input.GetButtonDown("Jump") && isGrounded)
+        // Lógica do pulo normal
+        if (!superJumpEnabled)
         {
-            rb.AddForce(Vector2.up * jumpForce, ForceMode2D.Impulse);
-            isGrounded = false;
+            if (Input.GetButtonDown("Jump") && isGrounded)
+                rb.AddForce(Vector2.up * jumpForce, ForceMode2D.Impulse);
         }
+        else
+        {
+            SuperJumpLogic();
+        }
+    }
+
+    void SuperJumpLogic()
+    {
+        // Começar a carregar
+        if (Input.GetKey(KeyCode.Space) && isGrounded)
+        {
+            if (!isCharging)
+            {
+                isCharging = true;
+                chargeTimer = 0f;
+
+                if (chargeParticles != null)
+                    chargeParticles.Play();
+            }
+
+            chargeTimer += Time.deltaTime;
+            chargeTimer = Mathf.Clamp(chargeTimer, 0f, maxChargeTime);
+        }
+
+        // Soltar espaço => super jump
+        if (Input.GetKeyUp(KeyCode.Space) && isCharging)
+        {
+            float chargePercent = chargeTimer / maxChargeTime;
+            float force = Mathf.Lerp(jumpForce, maxSuperJumpForce, chargePercent);
+
+            rb.AddForce(Vector2.up * force, ForceMode2D.Impulse);
+
+            StopCharging();
+        }
+    }
+
+    void StopCharging()
+    {
+        isCharging = false;
+        chargeTimer = 0f;
+
+        if (chargeParticles != null)
+            chargeParticles.Stop();
     }
 
     void FixedUpdate()
     {
-        // 3. CHECAGEM DE CHÃO COM RAYCAST no FixedUpdate()
-        Vector2 raycastOrigin = rb.position;
-        RaycastHit2D hit = Physics2D.Raycast(raycastOrigin, Vector2.down, groundCheckDistance, groundLayer);
+        // Verificação de chão
+        RaycastHit2D hit = Physics2D.Raycast(rb.position, Vector2.down, groundCheckDistance, groundLayer);
+        bool wasGrounded = isGrounded;
+        isGrounded = hit.collider != null;
 
-        isGrounded = (hit.collider != null);
+        if (isGrounded && !wasGrounded)
+            StopCharging();
 
-        // 4. LÓGICA DE VIRAR O PERSONAGEM (FLIP)
-        if (horizontalInput > 0) // Movendo para a direita
-        {
+        // Flip
+        if (horizontalInput > 0)
             spriteRenderer.flipX = false;
-        }
-        else if (horizontalInput < 0) // Movendo para a esquerda
-        {
+        else if (horizontalInput < 0)
             spriteRenderer.flipX = true;
-        }
 
-        // 5. MOVIMENTO HORIZONTAL SUAVIZADO POR VELOCIDADE
-
-        // Define a velocidade alvo para o eixo X
+        // Movimento suave
         float targetVelocityX = horizontalInput * speed;
 
-        // Interpola (suaviza) a velocidade X atual para a velocidade alvo.
         float newVelocityX = Mathf.Lerp(
             rb.linearVelocity.x,
             targetVelocityX,
             accelerationFactor * Time.fixedDeltaTime
         );
 
-        // Aplica a nova velocidade X, PRESERVANDO A VELOCIDADE Y para o pulo/gravidade.
         rb.linearVelocity = new Vector2(newVelocityX, rb.linearVelocity.y);
+    }
+
+    // MÉTODO USADO PELO POWER UP
+    public void EnableSuperJump()
+    {
+        superJumpEnabled = true;
     }
 }
