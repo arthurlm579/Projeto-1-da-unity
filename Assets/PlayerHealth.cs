@@ -1,58 +1,30 @@
-using UnityEngine;
-using UnityEngine.UI;
+﻿using UnityEngine;
 
 public class PlayerHealth : MonoBehaviour
 {
     public int maxHealth = 3;
     public int currentHealth;
 
-    public Slider healthBar;
-
-    private PlayerRespawn respawn;
+    public HealthBar healthBar;      // Referência da barra de vida
+    public GameOverManager gameOver; // Referência da tela de game over
 
     void Start()
     {
-        respawn = GetComponent<PlayerRespawn>();
-
         currentHealth = maxHealth;
-        healthBar.maxValue = maxHealth;
-        healthBar.value = currentHealth;
+        healthBar.SetMaxHealth(maxHealth);
     }
 
-    public void TakeDamage(int dmg)
+    public void TakeDamage(int amount)
     {
-        currentHealth -= dmg;
-
+        currentHealth -= amount;
         if (currentHealth < 0)
             currentHealth = 0;
 
-        healthBar.value = currentHealth;
+        healthBar.SetHealth(currentHealth);
 
         if (currentHealth <= 0)
-            Die();
-    }
-
-    void Die()
-    {
-        Debug.Log("PLAYER MORREU");
-
-        // Desativa o jogador
-        gameObject.SetActive(false);
-
-        // Chama respawn depois de 1 segundo
-        Invoke("RespawnPlayer", 1f);
-    }
-
-    void RespawnPlayer()
-    {
-        // Reativa o jogador
-        gameObject.SetActive(true);
-
-        // Teleporta para o checkpoint salvo
-        respawn.Respawn();
-
-        // Restaura a vida
-        currentHealth = maxHealth;
-        healthBar.value = currentHealth;
+        {
+            gameOver.ShowGameOver();
+        }
     }
 }

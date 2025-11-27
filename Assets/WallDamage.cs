@@ -1,59 +1,102 @@
 using UnityEngine;
 using System.Collections;
 
-public class BossDamageOnWall : MonoBehaviour
+public class BossController : MonoBehaviour
 {
-    public int damage = 10;
+    [Header("Vida")]
+    public int maxHealth = 5;
+    private int currentHealth;
 
-    private BossHealth bossHealth;
+    [Header("Charge Attack")]
+    public float chargeSpeed = 12f;
+    public float chargeCooldown = 2f;
+    public float chargeRange = 8f;
+    private bool canCharge = true;
+
+    [Header("Knockback e Stun")]
+    public float knockbackForce = 14f;
+    public float stunTime = 1f;
+    private bool isStunned = false;
+
     private Rigidbody2D rb;
+    private Transform player;
 
-    private void Start()
+    void Start()
     {
-        bossHealth = GetComponent<BossHealth>();
         rb = GetComponent<Rigidbody2D>();
+        rb.freezeRotation = true; // impede virar
+        currentHealth = maxHealth;
+
+        player = GameObject.FindGameObjectWithTag("Player").transform;
     }
 
-    private IEnumerator Knockback()
+    void Update()
     {
-        float knockTime = 0.08f;   // duração do efeito
-        float timer = 0f;
+        if (isStunned) return;
 
-        float dir = -Mathf.Sign(rb.linearVelocity.x);
+        // SÃ³ ataca se o player estiver perto
+        float distance = Vector2.Distance(transform.position, player.position);
 
-        // se estiver parado, empurra pra esquerda
-        if (dir == 0)
-            dir = -1;
-
-        while (timer < knockTime)
+        if (distance <= chargeRange && canCharge)
         {
-            // força forte do knockback (0.45)
-            rb.MovePosition(rb.position + new Vector2(dir * 0.45f, 0));
-
-            timer += Time.deltaTime;
-            yield return null;
+            StartCoroutine(DoCharge());
         }
     }
 
-    private void ApplyDamage()
+    IEnumerator DoCharge()
     {
-        bossHealth.TakeDamage(damage);
-        StartCoroutine(Knockback());
+        canCharge = false;
+
+        // calcula direÃ§Ã£o apenas horizontal
+        float dir = Mathf.Sign(player.position.x - transform.position.x);
+
+        rb.linearVelocity = new Vector2(dir * chargeSpeed, 0);
+
+        yield return new WaitForSeconds(0.4f);
+
+        rb.linearVelocity = Vector2.zero; // para apÃ³s o dash
+
+        yield return new WaitForSeconds(chargeCooldown);
+        canCharge = true;
     }
 
-    private void OnCollisionEnter2D(Collision2D collision)
+    // Dano e knockback ao bater na parede
+    void OnCollisionEnter2D(Collision2D collision)
     {
         if (collision.collider.CompareTag("Wall"))
         {
-            ApplyDamage();
+            TakeDamage();
+            ApplyKnockback(collision);
+            StartCoroutine(StunBoss());
         }
     }
 
-    private void OnTriggerEnter2D(Collider2D collision)
+    void TakeDamage()
     {
-        if (collision.CompareTag("Wall"))
+        currentHealth--;
+
+        if (currentHealth <= 0)
         {
-            ApplyDamage();
+            Destroy(gameObject);
         }
+    }
+
+    void ApplyKnockback(Collision2D collision)
+    {
+        Vector2 direction = (transform.position - collision.transform.position).normalized;
+
+        // remove velocidade antes do knockback
+        rb.linearVelocity = Vector2.zero;
+        rb.AddForce(direction * knockbackForce, ForceMode2D.Impulse);
+    }
+
+    IEnumerator StunBoss()
+    {
+        isStunned = true;
+        rb.linearVelocity = Vector2.zero;
+
+        yield return new WaitForSeconds(stunTime);
+
+        isStunned = false;
     }
 }
