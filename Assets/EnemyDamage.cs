@@ -2,27 +2,13 @@ using UnityEngine;
 
 public class EnemyDamage : MonoBehaviour
 {
-    public int damage = 1;
-    public float bounceForce = 10f;
+    public int damage = 20;
 
-    public void DamagePlayer(GameObject player)
+    private void OnCollisionEnter2D(Collision2D collision)
     {
-        var ph = player.GetComponent<PlayerHealth>();
-        if (ph != null)
+        if (collision.gameObject.CompareTag("Player"))
         {
-            ph.TakeDamage(damage);
+            collision.gameObject.GetComponent<PlayerHealth>().TakeDamage(damage);
         }
-    }
-
-    public void KillEnemy(GameObject player)
-    {
-        // faz o player quicar ao matar o inimigo
-        var rb = player.GetComponent<Rigidbody2D>();
-        if (rb != null)
-        {
-            rb.linearVelocity = new Vector2(rb.linearVelocity.x, bounceForce);
-        }
-
-        Destroy(gameObject);
     }
 }

@@ -2,21 +2,22 @@ using UnityEngine;
 
 public class PlayerRespawn : MonoBehaviour
 {
-    private Vector3 checkpointPos;
+    private Vector3 respawnPoint;
 
-    private void Start()
+    void Start()
     {
-        // Player começa na posição original
-        checkpointPos = transform.position;
+        // Caso ainda não tenha batido em nenhum checkpoint,
+        // o respawnPoint será onde o Player nasceu.
+        respawnPoint = transform.position;
     }
 
-    public void SetCheckpoint(Vector3 pos)
+    public void SetCheckpoint(Vector3 newPoint)
     {
-        checkpointPos = pos;
+        respawnPoint = newPoint;
     }
 
-    public void Respawn()
+    public void RespawnPlayer()
     {
-        transform.position = checkpointPos;
+        transform.position = respawnPoint;
     }
 }
